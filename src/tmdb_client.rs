@@ -1,0 +1,205 @@
+use base64::{Engine, engine::general_purpose};
+use reqwest::{
+    Client,
+    header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue},
+};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{env, fmt::Formatter};
+
+const BASE_URL: &str = "https://api.themoviedb.org/3";
+
+pub struct TmdbClient {
+    client: Client,
+}
+
+impl TmdbClient {
+    pub fn new() -> Self {
+        let auth_token = env::var("TMDB_TOKEN").expect("TMDB_TOKEN must be set in environment");
+
+        // Build the client with default headers
+        let client = reqwest::Client::builder()
+            .default_headers({
+                let mut headers = HeaderMap::new();
+                headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+                headers.insert(
+                    AUTHORIZATION,
+                    HeaderValue::from_str(&format!("Bearer {}", auth_token)).unwrap(),
+                );
+                headers
+            })
+            .build()
+            .unwrap();
+
+        Self { client }
+    }
+
+    pub async fn movies_by_actor(&self, actor_id: i64) -> Result<Vec<MovieDetail>, reqwest::Error> {
+        let url = format!("{BASE_URL}/discover/movie");
+
+        let response = self
+            .client
+            .get(url)
+            .query(&[("with_cast", actor_id)])
+            .send()
+            .await?;
+
+        let result: MovieResponse = response.json().await?;
+
+        Ok(result.results)
+    }
+
+    async fn actor_id(&self, actor_name: &str) -> Result<Option<i64>, reqwest::Error> {
+        let url = format!("{BASE_URL}/search/person");
+        let response = self
+            .client
+            .get(url)
+            .query(&[("query", actor_name), ("language", "en-US")])
+            .send()
+            .await?;
+
+        let json_value: Value = response.json().await?;
+
+        Ok(json_value
+            .get("results")
+            .and_then(|r| r.as_array())
+            .and_then(|arr| {
+                arr.iter()
+                    .find_map(|item| item.get("id").and_then(|id| id.as_i64()))
+            }))
+    }
+
+    pub async fn actor_info(
+        &self,
+        actor_name: &str,
+    ) -> Result<Option<PersonDetails>, reqwest::Error> {
+        let Some(person_id) = self.actor_id(actor_name).await? else {
+            return Ok(None);
+        };
+
+        let resposne = self
+            .client
+            .get(format!("{BASE_URL}/person/{person_id}"))
+            .send()
+            .await?;
+
+        Ok(Some(resposne.json::<PersonDetails>().await?))
+    }
+
+    pub fn resolve_image_url(image_path: &str) -> String {
+        let image_size = "w92";
+        format!("https://image.tmdb.org/t/p/{image_size}{image_path}")
+    }
+
+    async fn image_url_to_base64(&self, image_url: &str) -> Result<String, reqwest::Error> {
+        let response = self
+            .client
+            .get(image_url)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let bytes = response.bytes().await?;
+
+        let base64_string = general_purpose::STANDARD.encode(&bytes);
+
+        Ok(base64_string)
+    }
+
+    pub async fn image_as_base64(&self, image_path: &str) -> Result<String, reqwest::Error> {
+        self.image_url_to_base64(Self::resolve_image_url(image_path).as_str())
+            .await
+    }
+}
+
+// TMDB Types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MovieDetail {
+    pub adult: bool,
+    pub backdrop_path: Option<String>,
+    pub genre_ids: Vec<u32>,
+    pub id: i64,
+    pub original_language: String,
+    pub original_title: String,
+    pub overview: String,
+    pub popularity: f64,
+    pub poster_path: Option<String>,
+    pub release_date: String,
+    pub title: String,
+    pub video: bool,
+    pub vote_average: f64,
+    pub vote_count: u32,
+}
+
+impl std::fmt::Display for MovieDetail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let release_year = if self.release_date.len() > 4 {
+            Some(self.release_date[0..4].to_string())
+        } else {
+            None
+        };
+        write!(
+            f,
+            "{} {}",
+            self.title,
+            release_year
+                .map(|year| format!("({year})"))
+                .unwrap_or_default()
+        )
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MovieResponse {
+    results: Vec<MovieDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersonDetails {
+    /// Whether the person is marked as adult content
+    pub adult: bool,
+
+    /// Alternative names in different languages/scripts
+    #[serde(rename = "also_known_as")]
+    pub also_known_as: Vec<String>,
+
+    /// Biography text (often sourced from Wikipedia or TMDB editors)
+    pub biography: String,
+
+    /// Birth date in YYYY-MM-DD format
+    pub birthday: Option<String>,
+
+    /// Death date in YYYY-MM-DD format (null if still alive)
+    pub deathday: Option<String>,
+
+    /// Gender code (0 = unknown, 1 = female, 2 = male, 3 = non-binary)
+    pub gender: u8,
+
+    /// Official personal or agency homepage URL (often null)
+    pub homepage: Option<String>,
+
+    /// TMDB person ID
+    pub id: u32,
+
+    /// Corresponding IMDb ID (with "nm" prefix)
+    #[serde(rename = "imdb_id")]
+    pub imdb_id: Option<String>,
+
+    /// Primary department this person is known for
+    #[serde(rename = "known_for_department")]
+    pub known_for_department: String,
+
+    /// Primary name used for display
+    pub name: String,
+
+    /// Place of birth (city, country, etc.)
+    #[serde(rename = "place_of_birth")]
+    pub place_of_birth: Option<String>,
+
+    /// Popularity score (higher = more popular)
+    pub popularity: f64,
+
+    /// Relative path to profile image
+    #[serde(rename = "profile_path")]
+    pub profile_path: Option<String>,
+}
