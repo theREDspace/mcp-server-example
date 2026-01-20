@@ -8,10 +8,7 @@ use rust_mcp_sdk::{
     error::SdkResult,
     mcp_icon,
     mcp_server::{McpServerOptions, server_runtime},
-    schema::{
-        Implementation, InitializeResult, ProtocolVersion, ServerCapabilities,
-        ServerCapabilitiesTools,
-    },
+    schema::*,
 };
 
 #[tokio::main]

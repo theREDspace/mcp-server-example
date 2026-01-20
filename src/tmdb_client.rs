@@ -53,7 +53,7 @@ impl TmdbClient {
         let response = self
             .client
             .get(url)
-            .query(&[("with_cast", actor_id)])
+            .query(&[("with_cast", actor_id.to_string())])
             .send()
             .await?;
 
@@ -185,6 +185,7 @@ pub struct MovieDetail {
     pub vote_count: u32,
 }
 
+/// Implements Display for MovieDetail to show the movie title and release year (if available).
 impl std::fmt::Display for MovieDetail {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let release_year = if self.release_date.len() > 4 {
