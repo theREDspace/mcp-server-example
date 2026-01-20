@@ -9,11 +9,16 @@ use std::{env, fmt::Formatter};
 
 const BASE_URL: &str = "https://api.themoviedb.org/3";
 
+/// Client for interacting with The Movie Database (TMDB) API.
 pub struct TmdbClient {
     client: Client,
 }
 
 impl TmdbClient {
+    /// Creates a new TMDB client using the API token from the environment variable `TMDB_TOKEN`.
+    ///
+    /// # Panics
+    /// Panics if the `TMDB_TOKEN` environment variable is not set.
     pub fn new() -> Self {
         let auth_token = env::var("TMDB_TOKEN").expect("TMDB_TOKEN must be set in environment");
 
@@ -34,6 +39,14 @@ impl TmdbClient {
         Self { client }
     }
 
+    /// Retrieves a list of movies featuring the specified actor by TMDB actor ID.
+    ///
+    /// # Arguments
+    /// * `actor_id` - The TMDB ID of the actor.
+    ///
+    /// # Returns
+    /// * `Ok(Vec<MovieDetail>)` - List of movies the actor appeared in.
+    /// * `Err(reqwest::Error)` - If the request or parsing fails.
     pub async fn movies_by_actor(&self, actor_id: i64) -> Result<Vec<MovieDetail>, reqwest::Error> {
         let url = format!("{BASE_URL}/discover/movie");
 
@@ -49,6 +62,15 @@ impl TmdbClient {
         Ok(result.results)
     }
 
+    /// Searches for an actor by name and returns their TMDB ID if found.
+    ///
+    /// # Arguments
+    /// * `actor_name` - The name of the actor to search for.
+    ///
+    /// # Returns
+    /// * `Ok(Some(id))` - The TMDB ID of the actor if found.
+    /// * `Ok(None)` - If no actor is found.
+    /// * `Err(reqwest::Error)` - If the request or parsing fails.
     async fn actor_id(&self, actor_name: &str) -> Result<Option<i64>, reqwest::Error> {
         let url = format!("{BASE_URL}/search/person");
         let response = self
@@ -69,6 +91,15 @@ impl TmdbClient {
             }))
     }
 
+    /// Retrieves detailed information about an actor by name.
+    ///
+    /// # Arguments
+    /// * `actor_name` - The name of the actor.
+    ///
+    /// # Returns
+    /// * `Ok(Some(PersonDetails))` - Detailed info if the actor is found.
+    /// * `Ok(None)` - If no actor is found.
+    /// * `Err(reqwest::Error)` - If the request or parsing fails.
     pub async fn actor_info(
         &self,
         actor_name: &str,
@@ -86,11 +117,26 @@ impl TmdbClient {
         Ok(Some(resposne.json::<PersonDetails>().await?))
     }
 
+    /// Resolves a TMDB image path to a full image URL.
+    ///
+    /// # Arguments
+    /// * `image_path` - The relative path to the image from TMDB.
+    ///
+    /// # Returns
+    /// * `String` - The full URL to the image.
     pub fn resolve_image_url(image_path: &str) -> String {
         let image_size = "w92";
         format!("https://image.tmdb.org/t/p/{image_size}{image_path}")
     }
 
+    /// Downloads an image from a URL and encodes it as a base64 string.
+    ///
+    /// # Arguments
+    /// * `image_url` - The full URL to the image.
+    ///
+    /// # Returns
+    /// * `Ok(String)` - The base64-encoded image data.
+    /// * `Err(reqwest::Error)` - If the request or encoding fails.
     async fn image_url_to_base64(&self, image_url: &str) -> Result<String, reqwest::Error> {
         let response = self
             .client
@@ -106,6 +152,14 @@ impl TmdbClient {
         Ok(base64_string)
     }
 
+    /// Retrieves an image from TMDB by its path and returns it as a base64 string.
+    ///
+    /// # Arguments
+    /// * `image_path` - The relative path to the image from TMDB.
+    ///
+    /// # Returns
+    /// * `Ok(String)` - The base64-encoded image data.
+    /// * `Err(reqwest::Error)` - If the request or encoding fails.
     pub async fn image_as_base64(&self, image_path: &str) -> Result<String, reqwest::Error> {
         self.image_url_to_base64(Self::resolve_image_url(image_path).as_str())
             .await
