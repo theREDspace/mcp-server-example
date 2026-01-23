@@ -70,14 +70,10 @@ Biography: {}"#,
                 .collect::<Map<String, Value>>(),
         );
 
-        return Ok(CallToolResult {
-            content: vec![
-                ContentBlock::text_content(info),
-                ContentBlock::image_content(image_data, "image/jpeg".into()),
-            ],
-            is_error: None,
-            meta,
-            structured_content: None,
-        });
+        return Ok(CallToolResult::from_content(vec![
+            ContentBlock::text_content(info),
+            ContentBlock::image_content(image_data, "image/jpeg".into()),
+        ])
+        .with_meta(meta));
     }
 }
