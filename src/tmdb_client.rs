@@ -48,6 +48,7 @@ impl TmdbClient {
     /// * `Ok(Vec<MovieDetail>)` - List of movies the actor appeared in.
     /// * `Err(reqwest::Error)` - If the request or parsing fails.
     pub async fn movies_by_actor(&self, actor_id: i64) -> Result<Vec<MovieDetail>, reqwest::Error> {
+        // https://api.themoviedb.org/3/discover/movie?with_cast=
         let url = format!("{BASE_URL}/discover/movie");
 
         let response = self
@@ -72,6 +73,7 @@ impl TmdbClient {
     /// * `Ok(None)` - If no actor is found.
     /// * `Err(reqwest::Error)` - If the request or parsing fails.
     async fn actor_id(&self, actor_name: &str) -> Result<Option<i64>, reqwest::Error> {
+        // https://api.themoviedb.org/3/search/person?query=
         let url = format!("{BASE_URL}/search/person");
         let response = self
             .client
@@ -108,6 +110,7 @@ impl TmdbClient {
             return Ok(None);
         };
 
+        // https://api.themoviedb.org/3/search/person/{id}
         let resposne = self
             .client
             .get(format!("{BASE_URL}/person/{person_id}"))
