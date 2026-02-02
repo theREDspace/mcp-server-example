@@ -5,11 +5,12 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt::Display;
 use std::{env, fmt::Formatter};
 
 const BASE_URL: &str = "https://api.themoviedb.org/3";
 
-/// Client for interacting with The Movie Database (TMDB) API.
+/// A simple client for interacting with The Movie Database (TMDB) API.
 pub struct TmdbClient {
     client: Client,
 }
@@ -21,7 +22,6 @@ impl TmdbClient {
     /// Panics if the `TMDB_TOKEN` environment variable is not set.
     pub fn new() -> Self {
         let auth_token = env::var("TMDB_TOKEN").expect("TMDB_TOKEN must be set in environment");
-
         // Build the client with default headers
         let client = reqwest::Client::builder()
             .default_headers({
@@ -35,7 +35,6 @@ impl TmdbClient {
             })
             .build()
             .unwrap();
-
         Self { client }
     }
 
@@ -64,6 +63,7 @@ impl TmdbClient {
     }
 
     /// Searches for an actor by name and returns their TMDB ID if found.
+    /// this is used internally to find actor id by name, other details will be retrieved by other endpoints
     ///
     /// # Arguments
     /// * `actor_name` - The name of the actor to search for.
@@ -84,6 +84,7 @@ impl TmdbClient {
 
         let json_value: Value = response.json().await?;
 
+        // extract the .results.id from the response json and return it
         Ok(json_value
             .get("results")
             .and_then(|r| r.as_array())
@@ -111,13 +112,13 @@ impl TmdbClient {
         };
 
         // https://api.themoviedb.org/3/search/person/{id}
-        let resposne = self
+        let response = self
             .client
             .get(format!("{BASE_URL}/person/{person_id}"))
             .send()
             .await?;
 
-        Ok(Some(resposne.json::<PersonDetails>().await?))
+        Ok(Some(response.json::<PersonDetails>().await?))
     }
 
     /// Resolves a TMDB image path to a full image URL.
@@ -189,7 +190,7 @@ pub struct MovieDetail {
 }
 
 /// Implements Display for MovieDetail to show the movie title and release year (if available).
-impl std::fmt::Display for MovieDetail {
+impl Display for MovieDetail {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let release_year = if self.release_date.len() > 4 {
             Some(self.release_date[0..4].to_string())
@@ -260,4 +261,22 @@ pub struct PersonDetails {
     /// Relative path to profile image
     #[serde(rename = "profile_path")]
     pub profile_path: Option<String>,
+}
+
+impl Display for PersonDetails {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"ID: {}
+Name: {}
+Date of Birth: {}
+Place of Birth: {}
+Biography: {}"#,
+            self.id,
+            self.name,
+            self.birthday.as_deref().unwrap_or_default(),
+            self.place_of_birth.as_deref().unwrap_or_default(),
+            self.biography
+        )
+    }
 }

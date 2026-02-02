@@ -8,9 +8,17 @@ pub struct McpHandler {
     pub tmdb_client: TmdbClient,
 }
 
+/// MCP server handler implementation.
+///
+/// Handlers for processing incoming client messages and events can be
+/// implemented here. Only the handlers required by this server need to be provided.
+///
+/// For a complete list of all MCP client messages and events that may be
+/// implemented, see:
+/// https://github.com/rust-mcp-stack/rust-mcp-sdk/blob/main/crates/rust-mcp-sdk/src/mcp_handlers/mcp_server_handler.rs#L20
 #[async_trait]
 impl ServerHandler for McpHandler {
-    /// returns list of available tools.
+    /// returns list of available tools. (STEP 2 from slide)
     async fn handle_list_tools_request(
         &self,
         _params: Option<PaginatedRequestParams>,
@@ -23,7 +31,7 @@ impl ServerHandler for McpHandler {
         })
     }
 
-    /// Handles requests to call a specific tool.
+    /// Handles client requests to invoke a specific tool (Step 3 from the slide).
     async fn handle_call_tool_request(
         &self,
         params: CallToolRequestParams,
@@ -31,6 +39,7 @@ impl ServerHandler for McpHandler {
     ) -> std::result::Result<CallToolResult, CallToolError> {
         // Create a tool instance from the request, or return an error if the request is invalid.
         let requested_tool: TmdbTools = TmdbTools::try_from(params).map_err(CallToolError::new)?;
+
         // invoke the tool
         match requested_tool {
             TmdbTools::GetActorInfo(get_actor_info) => {

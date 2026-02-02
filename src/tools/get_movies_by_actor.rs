@@ -23,7 +23,9 @@ pub struct GetMoviesByActor {
     pub actor_id: i64,
 }
 
+// Implements the `invoke` function, which is executed whenever the client calls this tool.
 impl GetMoviesByActor {
+    // Executes the logic for this tool when it is invoked by the client.
     pub async fn invoke(
         &self,
         tmdb_client: &TmdbClient,
@@ -34,12 +36,14 @@ impl GetMoviesByActor {
             .await
             .map_err(|err| CallToolError::from_message(err.to_string()))?;
 
+        // return a error response if no moview were found
         if movies.is_empty() {
             return Ok(CallToolResult::with_error(CallToolError::from_message(
                 "No movies were found!",
             )));
         }
 
+        // Convert the list of movies into a numbered string list
         let result = movies
             .iter()
             .enumerate()

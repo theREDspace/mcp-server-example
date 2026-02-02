@@ -3,7 +3,6 @@ use rust_mcp_sdk::{
     macros::{JsonSchema, mcp_tool},
     schema::{CallToolError, CallToolResult, ContentBlock},
 };
-use serde_json::{Map, Value};
 
 #[mcp_tool(
     name = "get_actor_info",
@@ -25,19 +24,21 @@ pub struct GetActorInfo {
     pub actor_name: String,
 }
 
+// Implements the `invoke` function, which is executed whenever the client calls this tool.
 impl GetActorInfo {
+    // Executes the logic for this tool when it is invoked by the client.
     pub async fn invoke(
         &self,
         tmdb_client: &TmdbClient,
     ) -> std::result::Result<CallToolResult, CallToolError> {
-        // get actor details from tmdb
-        let details = tmdb_client
+        // make an api call and get actor details from tmdb
+        let response = tmdb_client
             .actor_info(&self.actor_name)
             .await
             .map_err(|err| CallToolError::from_message(err.to_string()))?;
 
         // return an error message if no actor with that name was found
-        let Some(actor_details) = details else {
+        let Some(actor_details) = response else {
             return Ok(CallToolResult::with_error(CallToolError::from_message(
                 format!(
                     "No actors matching the name \"{}\" were found",
@@ -46,34 +47,15 @@ impl GetActorInfo {
             )));
         };
 
-        let info = format!(
-            r#"ID: {}
-Name: {}
-Date of Birth: {}
-Place of Birth: {}
-Biography: {}"#,
-            actor_details.id,
-            actor_details.name,
-            actor_details.birthday.unwrap_or_default(),
-            actor_details.place_of_birth.unwrap_or_default(),
-            actor_details.biography,
-        );
-
+        // get the actor profile image as base64 encoded image and return it in the result
         let image_data = tmdb_client
-            .image_as_base64(&actor_details.profile_path.unwrap())
+            .image_as_base64(&actor_details.profile_path.as_ref().unwrap())
             .await
             .unwrap();
 
-        let meta = Some(
-            [("actor_id".to_string(), Value::from(actor_details.id))]
-                .into_iter()
-                .collect::<Map<String, Value>>(),
-        );
-
         return Ok(CallToolResult::from_content(vec![
-            ContentBlock::text_content(info),
-            ContentBlock::image_content(image_data, "image/jpeg".into()),
-        ])
-        .with_meta(meta));
+            ContentBlock::text_content(actor_details.to_string()), // actor info as string
+            ContentBlock::image_content(image_data, "image/jpeg".into()), // actor profile image as base64 blob
+        ]));
     }
 }

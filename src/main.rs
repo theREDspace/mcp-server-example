@@ -29,6 +29,7 @@ async fn main() -> SdkResult<()> {
         },
         capabilities: ServerCapabilities {
             tools: Some(ServerCapabilitiesTools { list_changed: None }),
+
             ..Default::default() // Using default values for other fields
         },
         meta: None,
